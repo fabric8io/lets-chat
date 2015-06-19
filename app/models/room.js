@@ -6,6 +6,8 @@
 
 var mongoose = require('mongoose'),
     uniqueValidator = require('mongoose-unique-validator'),
+    User = require('./user'),
+    settings = require('./../config'),
     bcrypt = require('bcryptjs');
 
 var ObjectId = mongoose.Schema.Types.ObjectId;
@@ -218,4 +220,73 @@ RoomSchema.statics.findByIdOrSlug = function(identifier, cb) {
     this.findOne(opts, cb);
 };
 
-module.exports = mongoose.model('Room', RoomSchema);
+var Room = mongoose.model('Room', RoomSchema);
+module.exports = Room;
+
+
+function initialiseDefaultRooms() {
+    function envVarOrDefault(envVar, defaultValue) {
+        var fullName = 'LETSCHAT_HUBOT_' + envVar;
+        var value = process.env[fullName];
+        return value || defaultValue;
+    }
+
+    // lets check if the auto-create rooms are there
+    var username = envVarOrDefault('USERNAME', 'hubot');
+    var autoCreateRooms = process.env.LETSCHAT_DEFAULT_ROOMS;
+    if (User && autoCreateRooms && username) {
+        console.log('using default username: ' + username);
+
+        User.findByIdentifier(username, function (err, user) {
+            if (err) {
+                console.error(err);
+                console.error(err.stack);
+            } else {
+                if (!user) {
+                    console.log('Count not find user: ' + username + ' so cannot create any default rooms');
+                } else {
+                    var rooms = autoCreateRooms.split(',');
+                    if (rooms) {
+                        var length = rooms.length;
+                        for (var i = 0; i < length; i++) {
+                            var roomId = rooms[i];
+                            if (roomId) {
+                                Room.findByIdOrSlug(roomId, function (err, room) {
+                                    if (err) {
+                                        console.error(err);
+                                        console.error(err.stack);
+                                    } else {
+                                        if (room) {
+                                            console.log('Found room for id: ' + roomId + ' already so not creating a new one');
+                                        } else {
+                                            console.log('Lets create a room id ' + roomId);
+
+                                            room = Room({
+                                                slug: roomId,
+                                                name: roomId,
+                                                description: 'Description for ' + roomId,
+                                                owner: user,
+                                                created: Date.now()
+                                            });
+
+                                            room.save(function (err, adminUser) {
+                                                if (err) {
+                                                    console.error(err);
+                                                    console.error(err.stack);
+                                                    console.error(message);
+                                                } else {
+                                                    console.info('Created room ' + room.slug);
+                                                }
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+initialiseDefaultRooms();
