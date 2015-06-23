@@ -55,8 +55,25 @@ function setup(app, session, core) {
         });
     }
 
+    function passwordAuth(username, password, done) {
+        var User = mongoose.model('User');
+        if (password) {
+            password = password.trim();
+        }
+        User.authenticate(username, password, function(err, user) {
+            if (err) {
+                return done(null, false);
+            }
+            if (user) {
+                return done(null, user);
+            } else {
+                return done(null, null);
+            }
+        });
+    }
+
     passport.use(new BearerStrategy(tokenAuth));
-    passport.use(new BasicStrategy(tokenAuth));
+    passport.use(new BasicStrategy(passwordAuth));
 
     passport.serializeUser(function(user, done) {
         done(null, user._id);
